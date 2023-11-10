@@ -1,217 +1,178 @@
-let movies = []
+let moviesData = [];
 let currentPage = 1;
-const renderMovies = (movies)=>{
-    const moviesList = document.getElementById("movies-list");
-    moviesList.innerHTML = '';
-    movies.map((movie)=>{
-        const {poster_path,title,vote_count,vote_average} = movie;
-        let listItem = document.createElement("li");
-        listItem.className = "card";
-        listItem.innerHTML = `
-        <img
-                    class="poster"
-                    src=https://image.tmdb.org/t/p/original/${poster_path}
-                    alt="movie-title"
-                />
-                <p class="title">${title}</p>
-                <section class="vote-favouriteIcon">
-                    <section class="vote">
-                    <p class="vote-count">${vote_count}</p>
-                    <p class="vote-average">${vote_average}</p>
-                    </section>
-                    <i class="fa-regular fa-heart fa-2xl" id="favorite-icon"></i>
-                </section>
-        `
-        moviesList.appendChild(listItem);
+let sortedByRating = false;
+let sortedByRatingAscending = false;
+let sortedByDate = false;
+let sortedByDateAscending = false;
+let sortedMovies = [];
+let active = "all";
+let favoriteBtns = [];
+let favorites = [];
+if(localStorage.getItem("favorites"))
+favorites = JSON.parse(localStorage.getItem("favorites"));
+else
+localStorage.setItem("favorites", JSON.stringify([]));
+const sortByRatingBtn = document.getElementById("sort-by-rating");
+const sortByDateBtn = document.getElementById("sort-by-date");
+const movies = document.getElementById("movies-list");
+const prevBtn = document.getElementById("prev-button");
+const nextBtn = document.getElementById("next-button");
+const curPageBtn = document.getElementById("page-number-button");
+const favoritesTab = document.querySelector(".favorites-tab");
+const allTab = document.querySelector(".all-tab");
+const searchInput = document.getElementById("search-input");
+const searchBtn = document.getElementById("search-button");
 
+async function fetchMovies(page){
+    try{
+        const data = await ( await fetch(`https://api.themoviedb.org/3/movie/top_rated?api_key=f531333d637d0c44abc85b3e74db2186&language=en-US&page=${page}`) ).json();
+        // console.log(data);
+        moviesData = data.results;
+        // console.log(moviesData);
+        renderMovies(moviesData);
+    }catch(e){
+        console.log(e.message);
+    }
+}
+
+function renderMovies(moviesData, isFavo){
+    movies.innerHTML = "";
+    moviesData.forEach(({title, id, poster_path, vote_count,vote_average}) =>{
+        // console.log(title,poster_path,vote_average,vote_count);
+        let item = document.createElement("li");
+        item.classList.add("card");
+        if(isFavo){
+            if(favorites.includes(""+id))
+                item.classList.add("favorite-card");
+            else
+                item.style.display = "none";
+        }
+        item.innerHTML =`
+        <img src="https://image.tmdb.org/t/p/original/${poster_path}" alt="" class="poster">
+        <p class="title">${title}</p>
+        <section class="vote-favouriteIcon">
+            <i data-id=${id} class="fa-regular fa-heart fa-2xl favorite-icon"></i>
+            <div class="votes">
+                <p class="vote-count">Votes: ${vote_count}</p>
+                <p class="vote-average">Rating: ${vote_average}</p>
+            </div>
+        </section>
+        `
+        movies.appendChild(item);
+    })
+    renderFavIcons();
+    favoriteBtns.forEach(cur =>{
+        cur.addEventListener("click", ()=>{
+            favorites = JSON.parse(localStorage.getItem("favorites"))
+            const id = cur.dataset.id;
+            if(favorites.includes(id)){
+                cur.style.color = "black"
+                favorites.splice(favorites.indexOf(id),1);
+                cur.parentElement.parentElement.classList.remove("favorite-card")
+                if(active == "favorite")
+                    cur.parentElement.parentElement.style.display = "none"
+            }else{
+                cur.parentElement.parentElement.classList.add("favorite-card")
+                favorites.push(id);
+                cur.style.color = "red"
+            }
+            localStorage.setItem("favorites", JSON.stringify(favorites));
+        })
     })
 }
-async function fetchMovies(page){
-    try {
-        const response =await fetch(`https://api.themoviedb.org/3/movie/top_rated?api_key=f531333d637d0c44abc85b3e74db2186&language=en-US&page=${page}`);
-        const result = await response.json();
-        movies = result.results;
-        console.log(movies)
-        renderMovies(movies);
-        
-    } catch (error) {
-        console.log(error)
-    }
-}
-fetchMovies(currentPage)
-//sorting section
-let firstSortByRating =true;
-let firstSortByRatingButton = document.getElementById("sort-by-rating");
-firstSortByRatingButton.addEventListener('click', sortByRating)
-function sortByRating(){
-    let sortedMovies;
-    if(firstSortByRating){
-      sortedMovies = movies.sort((a,b)=>a.vote_average - b.vote_average);
-      firstSortByRatingButton.innerText = "Sort by rating(most to least)";
-      firstSortByRating = false ;
-    } else if(!firstSortByRating){
-        sortedMovies = movies.sort((a,b)=>b.vote_average - a.vote_average);
-      firstSortByRatingButton.innerText = "Sort by rating(least to most)";
-      firstSortByRating = true;
-    }
-    renderMovies(sortedMovies)
-}
-let firstSortByDate =true;
-let firstSortByDateButton = document.getElementById("sort-by-date");
-firstSortByDateButton.addEventListener('click', sortByDate)
-function sortByDate(){
-    let sortedMovies;
-    if(firstSortByDate){
-      sortedMovies = movies.sort((a,b)=>new Date(a.release_date) - new Date(b.release_date));
-      firstSortByDateButton.innerText = "Sort by date (latest to oldest)";
-      firstSortByDate = false ;
-    } else if(!firstSortByDate){
-        sortedMovies = movies.sort((a,b)=>new Date(b.release_date) - new Date(a.release_date));
-      firstSortByDateButton.innerText = "Sort by date (oldest to latest)";
-      firstSortByDate = true;
-    }
-    renderMovies(sortedMovies)
-}
-//sorting section ends
-// pagination section
-let prevButton = document.getElementById("prev-button");
-let pageNumberButton = document.getElementById("page-number-button");
-let nextButton = document.getElementById("next-button");
-prevButton.disabled = true;
+function renderFavIcons(){
+    favoriteBtns = document.querySelectorAll(".card i");
+    // let arr = JSON.parse(localStorage.getItem("favorites")) ?? [];
+    // console.log(favoriteBtns);
+    favorites.forEach(id =>{
+        let icon =  document.querySelector(`i[data-id="${id}"]`)
+        if(icon){
+            icon.style.color = "red";
+            icon.parentElement.parentElement.classList.add("favorite-card")
+        }
+    })
+}    
+fetchMovies(currentPage);
 
-prevButton.addEventListener("click",()=>{
-    currentPage--;
-    fetchMovies(currentPage);
-    pageNumberButton.innerText = `current Page: ${currentPage}`;
-    if(currentPage === 1){
-        prevButton.disabled=true;
-        nextButton.disabled=false;
-    } else {
-        prevButton.disabled=false;
-        nextButton.disabled=false;
+sortByRatingBtn.addEventListener("click", ()=>{
+    if(sortedByRatingAscending){
+        sortedByRatingAscending = false;
+        moviesData.sort((a,b) => b.vote_average - a.vote_average);
+        sortByRatingBtn.innerText = "Sort by rating (least to most)";
+    }else{
+        sortedByRatingAscending = true;
+        moviesData.sort((a,b) => a.vote_average - b.vote_average);
+        sortByRatingBtn.innerText = "Sort by rating (most to least)";
     }
+    movies.innerHTML = "";
+    renderMovies(moviesData, active == "favorite");
 })
-nextButton.addEventListener("click",()=>{
+sortByDateBtn.addEventListener("click", ()=>{
+    if(sortedByDateAscending){
+        sortedByDateAscending = false;
+        moviesData.sort((a,b) => new Date(b.release_date) - new Date(a.release_date));
+        sortByDateBtn.innerText = "Sort by date (oldest to latest)";
+    }else{
+        sortedByDateAscending = true;
+        moviesData.sort((a,b) => new Date(a.release_date) - new Date(b.release_date));
+        sortByDateBtn.innerText = "Sort by date (latest to oldest)";
+    }
+    movies.innerHTML = "";
+    renderMovies(moviesData, active == "favorite");
+})
+
+nextBtn.addEventListener("click", ()=>{
     currentPage++;
     fetchMovies(currentPage);
-    pageNumberButton.innerText = `current Page: ${currentPage}`;
-    if(currentPage === 3){
-        prevButton.disabled=false;
-        nextButton.disabled=true;
-    } else {
-        prevButton.disabled=false;
-        nextButton.disabled=false;
-    }
+    curPageBtn.innerText = `Current Page: ${currentPage}`;
+    prevBtn.disabled = false;
+    if(currentPage == 3)
+        nextBtn.disabled = true;
+    favoritesTab.classList.remove("active-tab");
+    allTab.classList.add("active-tab");
+    active = "all";
 })
-function getMovieNameFromLocalStorage(){
-    const favouriteMovies = JSON.parse(localStorage.getItem("favoriteMovies"))
-    return favouriteMovies === null ? [] :favouriteMovies;
-}
-
-function addMovieNameToLocalStorage(movieName){
-   const favoriteMovies = getMovieNameFromLocalStorage();
-  localStorage.setItem("favoriteMovies",
-  JSON.stringify([...favoriteMovies,movieName])) 
-}
-
-function removeMovieNameFromLocalStorage(movieName){
-    const favoriteMovies = getMovieNameFromLocalStorage();
-   localStorage.setItem("favoriteMovies",
-   JSON.stringify(favoriteMovies.filter((name)=> name !== movieName)))
-}
-
-//search Section
-const searchMovies =async (searchMovie)=>{
-   try {
-    const response =await fetch(`https://api.themoviedb.org/3/search/movie?query=${searchMovie}&include_adult=false&language=en-US&page=1&api_key=f531333d637d0c44abc85b3e74db2186`);
-    const result = await response.json();
-    movies =result.results;
-    renderMovies(movies);
-   }
-   catch(error){
-    console.log(error)
-   }
-}
-const searchButton = document.getElementById("search-button");
-const searchInput = document.getElementById("search-input");
-const pagination = document.getElementById("pagination")
-searchButton.addEventListener("click",()=>{
-    searchMovies(searchInput.value);
-    pagination.style.display="none";
+prevBtn.addEventListener("click", ()=>{
+    currentPage--;
+    fetchMovies(currentPage);
+    curPageBtn.innerText = `Current Page: ${currentPage}`;
+    nextBtn.disabled = false;
+    if(currentPage == 1)
+        prevBtn.disabled = true;
+    favoritesTab.classList.remove("active-tab");
+    allTab.classList.add("active-tab");
+    active = "all";
 })
 
-const getMovieByName = async (movieName)=>{
-    try {
-        const response =await fetch(`https://api.themoviedb.org/3/search/movie?query=${movieName}&include_adult=false&language=en-US&page=1&api_key=f531333d637d0c44abc85b3e74db2186`);
-        const result = await response.json();
-        return result.results[0];
+favoritesTab.addEventListener("click", ()=>{
+    if(active != "favorite"){
+        favoritesTab.classList.add("active-tab");
+        allTab.classList.remove("active-tab");
+        active = "favorite";
+        document.querySelectorAll(".card").forEach(cur =>{
+            if(!cur.classList.contains("favorite-card"))
+                cur.style.display = "none";
+        })
         
-       }
-       catch(error){
-        console.log(error)
-       }
-}
-
-
-const showFavorites = (favMoviesName)=>{
-    const {poster_path,title,vote_count,vote_average} = favMoviesName;
-    const moviesList = document.getElementById("movies-list");
-    let listItem = document.createElement("li");
-    listItem.className = "card";
-    listItem.innerHTML = `
-    <img
-                class="poster"
-                src=https://image.tmdb.org/t/p/original/${poster_path}
-                alt="movie-title"
-            />
-            <p class="title">${title}</p>
-            <section class="vote-favouriteIcon">
-                <section class="vote">
-                <p class="vote-count">${vote_count}</p>
-                <p class="vote-average">${vote_average}</p>
-                </section>
-                <i class="fa-solid fa-xmark fa-xl xmark" id="favorite-icon"></i>
-            </section>
-    `
-    const removelistfromFavorite = listItem.querySelector(".xmark")
-    removelistfromFavorite.addEventListener("click",(event)=>{
-         const {id} = event.target;
-         removeMovieNameFromLocalStorage(id);
-         fetchWishlistMovie();
-    });
-    moviesList.appendChild(listItem);
-    
-}
-
-const fetchWishlistMovie = async ()=>{
-    const movieList = getMovieNameFromLocalStorage();
-    for (let i =0;i< movieList.length;i++){
-        const movieName = movieList[i];
-        const movieData = await getMovieByName(movieName);
-        console.log(movieData)
-        showFavorites(movieData);
     }
-}
-
-const allTab= document.getElementById("all-tab");
-const favoriteTab = document.getElementById("favorites-tab");
-console.log(favoriteTab)
-
-function displayMovies(){
-    if(allTab.classList.contains("active-tab")){
-        renderMovies(movies);
-
-    }else if(favoriteTab.classList.contains("active-tab")){
-        fetchWishlistMovie();
-        pagination.style.display="none";
+})
+allTab.addEventListener("click", ()=>{
+    if(active != "all"){
+        favoritesTab.classList.remove("active-tab");
+        allTab.classList.add("active-tab");
+        active = "all";
+        document.querySelectorAll(".card").forEach(cur =>{
+            cur.style.display = "unset";
+        })
     }
+})
+let timer;
+searchInput.addEventListener("input", ()=>{
+    clearTimeout(timer);
+    timer = setTimeout(searchMovie, 1000);
+})
+async function searchMovie(page = 1){
+    let query = searchInput.value;
+    moviesData = (await (await fetch(`https://api.themoviedb.org/3/search/movie?query=${query}&include_adult=false&language=en-US&page=${page}&api_key=f531333d637d0c44abc85b3e74db2186`)).json()).results;
+    renderMovies(moviesData);
 }
-function switchTab(event){
-    allTab.classList.remove("active-tab");
-    favoriteTab.classList.remove("active-tab");
-    event.target.classList.add("active-tab");
-    displayMovies();
-}
-
-allTab.addEventListener("click",switchTab)
-favoriteTab.addEventListener("click",switchTab)
